@@ -1,28 +1,21 @@
+#nullable enable // 2. Вмикаємо перевірку на null для підвищення безпеки коду
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace UniversityModel
 {
-    // --- Файл: Person.cs ---
-
-    /// <summary>
-    /// Представляє базовий клас для людини з основними персональними даними.
-    /// </summary>
     public class Person
     {
-        public string FirstName { get; set; }
-        public string LastName { get; set; }
-        public string Patronymic { get; set; }
+        // 1. Властивості тепер незмінні після створення об'єкта (init замість set)
+        public string FirstName { get; init; }
+        public string LastName { get; init; }
+        public string Patronymic { get; init; }
         public DateTime DateOfBirth { get; private set; }
 
-        /// <summary>
-        /// Ініціалізує новий екземпляр класу <see cref="Person"/> з валідацією вхідних даних.
-        /// </summary>
-        /// <exception cref="ArgumentException">Викидається, якщо рядкові параметри порожні або дата некоректна.</exception>
         public Person(string firstName, string lastName, string patronymic, int year, int month, int day)
         {
-            // --- 1. ВАЛІДАЦІЯ КОНСТРУКТОРА ---
             if (string.IsNullOrWhiteSpace(firstName))
                 throw new ArgumentException("Ім'я не може бути порожнім.", nameof(firstName));
             if (string.IsNullOrWhiteSpace(lastName))
@@ -36,8 +29,7 @@ namespace UniversityModel
             }
             catch (ArgumentOutOfRangeException ex)
             {
-                // Перетворюємо системний виняток у більш зрозумілий для користувача
-                throw new ArgumentException("Вказана некоректна дата народження (неправильний день, місяць або рік).", ex);
+                throw new ArgumentException("Вказана некоректна дата народження.", ex);
             }
 
             FirstName = firstName;
@@ -45,65 +37,48 @@ namespace UniversityModel
             Patronymic = patronymic;
         }
         
-        public virtual int CalculateAge()
+        /// <summary>
+        /// Обчислює повний вік людини на основі заданої поточної дати.
+        /// </summary>
+        /// <param name="currentDate">Дата, на яку потрібно обчислити вік.</param>
+        /// <returns>Кількість повних років.</returns>
+        public int CalculateAge(DateTime currentDate)
         {
-            DateTime today = DateTime.Today;
-            int age = today.Year - DateOfBirth.Year;
-            if (DateOfBirth.Date > today.AddYears(-age))
+            int age = currentDate.Year - DateOfBirth.Year;
+            if (DateOfBirth.Date > currentDate.AddYears(-age))
             {
                 age--;
             }
             return age;
         }
 
-        /// <summary>
-        /// Підраховує кількість входжень заданого символу в прізвищі (без урахування регістру).
-        /// </summary>
         public int CountCharInLastName(char characterToCount)
         {
-            // --- 2. ПОЛІПШЕНЕ ПОРІВНЯННЯ СИМВОЛІВ ---
             char invariantChar = char.ToUpperInvariant(characterToCount);
-            return LastName?.Count(c => char.ToUpperInvariant(c) == invariantChar) ?? 0;
+            return LastName.Count(c => char.ToUpperInvariant(c) == invariantChar);
         }
 
         public virtual string GetInfo()
         {
-            return $"Людина: {LastName} {FirstName}, вік: {CalculateAge()}";
+            return $"Людина: {LastName} {FirstName}, вік: {CalculateAge(DateTime.Today)}";
         }
     }
 
-    // --- Файл: Student.cs ---
-
-    /// <summary>
-    /// Представляє студента, успадковуючи властивості від класу <see cref="Person"/>.
-    /// </summary>
     public class Student : Person
     {
-        public int AdmissionYear { get; set; }
-        public string Specialty { get; set; }
+        public int AdmissionYear { get; init; }
+        public string Specialty { get; init; }
 
-        /// <summary>
-        /// Ініціалізує новий екземпляр класу <see cref="Student"/>.
-        /// </summary>
-        /// <param name="firstName">Ім'я.</param>
-        /// <param name="lastName">Прізвище.</param>
-        /// <param name="patronymic">По-батькові.</param>
-        /// <param name="year">Рік народження.</param>
-        /// <param name="month">Місяць народження.</param>
-        /// <param name="day">День народження.</param>
-        /// <param name="admissionYear">Рік вступу до ВНЗ.</param>
-        /// <param name="specialty">Назва спеціальності.</param>
-        /// <exception cref="ArgumentException">Викидається, якщо спеціальність порожня.</exception>
-        /// <exception cref="ArgumentOutOfRangeException">Викидається, якщо рік вступу некоректний.</exception>
         public Student(string firstName, string lastName, string patronymic, int year, int month, int day, int admissionYear, string specialty)
-            : base(firstName, lastName, patronymic, year, month, day) // Валідація базового класу викликається автоматично
+            : base(firstName, lastName, patronymic, year, month, day)
         {
             if (string.IsNullOrWhiteSpace(specialty))
                 throw new ArgumentException("Назва спеціальності не може бути порожньою.", nameof(specialty));
             
-            // Рік вступу не може бути раніше, ніж людині виповнилось 16 років
-            if (admissionYear < DateOfBirth.Year + 16)
-                throw new ArgumentOutOfRangeException(nameof(admissionYear), $"Неможливий рік вступу ({admissionYear}) для народженого в {DateOfBirth.Year} році.");
+            // 3. Більш точна валідація: перевіряємо, чи виповнилось 16 років на 1 вересня року вступу
+            DateTime admissionDate = new DateTime(admissionYear, 9, 1);
+            if (admissionDate < DateOfBirth.AddYears(16))
+                throw new ArgumentOutOfRangeException(nameof(admissionYear), $"Неможливий рік вступу ({admissionYear}): студенту має бути не менше 16 років.");
 
             AdmissionYear = admissionYear;
             Specialty = specialty;
@@ -111,11 +86,9 @@ namespace UniversityModel
 
         public override string GetInfo()
         {
-            return $"Студент: {LastName} {FirstName}, вік: {CalculateAge()}\nСпеціальність: {Specialty}, рік вступу: {AdmissionYear}";
+            return $"Студент: {LastName} {FirstName}, вік: {CalculateAge(DateTime.Today)}\nСпеціальність: {Specialty}, рік вступу: {AdmissionYear}";
         }
     }
-
-    // --- Файл: Program.cs ---
 
     internal class Program
     {
@@ -124,37 +97,33 @@ namespace UniversityModel
             Console.OutputEncoding = System.Text.Encoding.UTF8;
             Console.InputEncoding = System.Text.Encoding.UTF8;
 
+            // 4. Запускаємо Unit-тести для перевірки коректності логіки
+            RunUnitTests();
+
             try
             {
-                // Створюємо об'єкти. Якщо дані будуть невірні, тут виникне виняток.
                 Person person = new Person("Тарас", "Шевченко", "Григорович", 1814, 3, 9);
                 Student student = new Student("Іван", "Франко", "Якович", 2005, 8, 27, 2022, "Комп'ютерні науки");
-
-                // Виконання завдань
+                
                 RunTasks(person, student);
             }
             catch (ArgumentException ex)
             {
-                // --- 4. ОБРОБКА ВИНЯТКІВ ---
                 Console.ForegroundColor = ConsoleColor.Red;
                 Console.WriteLine($"\nПОМИЛКА при створенні об'єкта: {ex.Message}");
                 Console.ResetColor();
             }
         }
 
-        /// <summary>
-        /// Виконує основні завдання програми.
-        /// </summary>
         private static void RunTasks(Person person, Student student)
         {
-            Console.WriteLine($"Вік студента {student.LastName} складає: {student.CalculateAge()} років.\n");
+            Console.WriteLine($"\nВік студента {student.LastName} складає: {student.CalculateAge(DateTime.Today)} років.\n");
 
-            // --- 3. НАДІЙНА ОБРОБКА ВВОДУ ---
             char letterToSearch;
             while (true)
             {
                 Console.Write("Введіть ОДНУ літеру для пошуку в прізвищі 'Шевченко' та натисніть Enter: ");
-                string input = Console.ReadLine();
+                string? input = Console.ReadLine();
 
                 if (input?.Length == 1 && char.IsLetter(input[0]))
                 {
@@ -173,6 +142,58 @@ namespace UniversityModel
             {
                 Console.WriteLine(p.GetInfo());
                 Console.WriteLine("--------------------");
+            }
+        }
+
+        /// <summary>
+        /// Простий тестовий фреймворк для перевірки ключової логіки.
+        /// У реальному проекті для цього використовуються бібліотеки (MSTest, NUnit, xUnit).
+        /// </summary>
+        private static void RunUnitTests()
+        {
+            Console.WriteLine("--- Запуск Unit-тестів ---");
+            int testsPassed = 0;
+            int totalTests = 0;
+
+            Action<string, bool> Assert = (testName, condition) =>
+            {
+                totalTests++;
+                if (condition)
+                {
+                    testsPassed++;
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"[УСПІХ] {testName}");
+                }
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"[ПРОВАЛ] {testName}");
+                }
+                Console.ResetColor();
+            };
+
+            // Тести для CalculateAge
+            var today = new DateTime(2025, 10, 14);
+            var p1 = new Person("Тест1", "Вік", "Точний", 2005, 5, 20); // 20 років
+            var p2 = new Person("Тест2", "Вік", "СьогодніДН", 2005, 10, 14); // 20 років
+            var p3 = new Person("Тест3", "Вік", "ЗавтраДН", 2005, 10, 15); // 19 років
+            Assert("CalculateAge: Стандартний випадок", p1.CalculateAge(today) == 20);
+            Assert("CalculateAge: День народження сьогодні", p2.CalculateAge(today) == 20);
+            Assert("CalculateAge: День народження завтра", p3.CalculateAge(today) == 19);
+
+            // Тести для CountCharInLastName
+            var searchPerson = new Person("Тест", "Шевченко", "Тест", 2000, 1, 1);
+            Assert("CountChar: Кілька входжень", searchPerson.CountCharInLastName('е') == 2);
+            Assert("CountChar: Чутливість до регістру (пошук 'Е')", searchPerson.CountCharInLastName('Е') == 2);
+            Assert("CountChar: Символ відсутній", searchPerson.CountCharInLastName('я') == 0);
+            
+            Console.WriteLine($"--- Тести завершено. Пройдено: {testsPassed}/{totalTests} ---\n");
+            
+            if (testsPassed != totalTests)
+            {
+                 Console.ForegroundColor = ConsoleColor.Red;
+                 Console.WriteLine("!!! УВАГА: Деякі тести не пройдено. Подальше виконання може бути некоректним. !!!\n");
+                 Console.ResetColor();
             }
         }
     }
