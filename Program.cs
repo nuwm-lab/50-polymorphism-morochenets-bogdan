@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-// 1. Створено namespace для кращої організації проекту
 namespace UniversityModel
 {
     // --- Файл: Person.cs ---
@@ -12,47 +11,40 @@ namespace UniversityModel
     /// </summary>
     public class Person
     {
-        /// <summary>
-        /// Отримує або задає ім'я людини.
-        /// </summary>
         public string FirstName { get; set; }
-
-        /// <summary>
-        /// Отримує або задає прізвище людини.
-        /// </summary>
         public string LastName { get; set; }
-
-        /// <summary>
-        /// Отримує або задає по-батькові людини.
-        /// </summary>
         public string Patronymic { get; set; }
-
-        /// <summary>
-        /// Отримує дату народження.
-        /// </summary>
         public DateTime DateOfBirth { get; private set; }
 
         /// <summary>
-        /// Ініціалізує новий екземпляр класу <see cref="Person"/>.
+        /// Ініціалізує новий екземпляр класу <see cref="Person"/> з валідацією вхідних даних.
         /// </summary>
-        /// <param name="firstName">Ім'я.</param>
-        /// <param name="lastName">Прізвище.</param>
-        /// <param name="patronymic">По-батькові.</param>
-        /// <param name="year">Рік народження.</param>
-        /// <param name="month">Місяць народження.</param>
-        /// <param name="day">День народження.</param>
+        /// <exception cref="ArgumentException">Викидається, якщо рядкові параметри порожні або дата некоректна.</exception>
         public Person(string firstName, string lastName, string patronymic, int year, int month, int day)
         {
+            // --- 1. ВАЛІДАЦІЯ КОНСТРУКТОРА ---
+            if (string.IsNullOrWhiteSpace(firstName))
+                throw new ArgumentException("Ім'я не може бути порожнім.", nameof(firstName));
+            if (string.IsNullOrWhiteSpace(lastName))
+                throw new ArgumentException("Прізвище не може бути порожнім.", nameof(lastName));
+            if (string.IsNullOrWhiteSpace(patronymic))
+                throw new ArgumentException("По-батькові не може бути порожнім.", nameof(patronymic));
+
+            try
+            {
+                DateOfBirth = new DateTime(year, month, day);
+            }
+            catch (ArgumentOutOfRangeException ex)
+            {
+                // Перетворюємо системний виняток у більш зрозумілий для користувача
+                throw new ArgumentException("Вказана некоректна дата народження (неправильний день, місяць або рік).", ex);
+            }
+
             FirstName = firstName;
             LastName = lastName;
             Patronymic = patronymic;
-            DateOfBirth = new DateTime(year, month, day);
         }
-
-        /// <summary>
-        /// Обчислює повний вік людини на поточну дату.
-        /// </summary>
-        /// <returns>Кількість повних років.</returns>
+        
         public virtual int CalculateAge()
         {
             DateTime today = DateTime.Today;
@@ -65,23 +57,15 @@ namespace UniversityModel
         }
 
         /// <summary>
-        /// Підраховує кількість входжень заданого символу в прізвищі.
+        /// Підраховує кількість входжень заданого символу в прізвищі (без урахування регістру).
         /// </summary>
-        /// <param name="characterToCount">Символ для пошуку.</param>
-        /// <returns>Кількість входжень символу.</returns>
         public int CountCharInLastName(char characterToCount)
         {
-            // 2. Додано перевірку на null (null-safety) та культуро-незалежне порівняння
-            return LastName?.Count(c => char.Equals(c, characterToCount)) ?? 0;
-            // Альтернативний варіант з ігноруванням регістру:
-            // return LastName?.Count(c => char.ToUpperInvariant(c) == char.ToUpperInvariant(characterToCount)) ?? 0;
+            // --- 2. ПОЛІПШЕНЕ ПОРІВНЯННЯ СИМВОЛІВ ---
+            char invariantChar = char.ToUpperInvariant(characterToCount);
+            return LastName?.Count(c => char.ToUpperInvariant(c) == invariantChar) ?? 0;
         }
 
-        /// <summary>
-        /// Повертає рядок з основною інформацією про людину.
-        /// (Віртуальний метод для демонстрації поліморфізму).
-        /// </summary>
-        /// <returns>Інформаційний рядок.</returns>
         public virtual string GetInfo()
         {
             return $"Людина: {LastName} {FirstName}, вік: {CalculateAge()}";
@@ -95,30 +79,36 @@ namespace UniversityModel
     /// </summary>
     public class Student : Person
     {
-        /// <summary>
-        /// Отримує або задає рік вступу до ВНЗ.
-        /// </summary>
         public int AdmissionYear { get; set; }
-
-        /// <summary>
-        /// Отримує або задає назву спеціальності.
-        /// </summary>
         public string Specialty { get; set; }
 
         /// <summary>
         /// Ініціалізує новий екземпляр класу <see cref="Student"/>.
         /// </summary>
+        /// <param name="firstName">Ім'я.</param>
+        /// <param name="lastName">Прізвище.</param>
+        /// <param name="patronymic">По-батькові.</param>
+        /// <param name="year">Рік народження.</param>
+        /// <param name="month">Місяць народження.</param>
+        /// <param name="day">День народження.</param>
+        /// <param name="admissionYear">Рік вступу до ВНЗ.</param>
+        /// <param name="specialty">Назва спеціальності.</param>
+        /// <exception cref="ArgumentException">Викидається, якщо спеціальність порожня.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">Викидається, якщо рік вступу некоректний.</exception>
         public Student(string firstName, string lastName, string patronymic, int year, int month, int day, int admissionYear, string specialty)
-            : base(firstName, lastName, patronymic, year, month, day)
+            : base(firstName, lastName, patronymic, year, month, day) // Валідація базового класу викликається автоматично
         {
+            if (string.IsNullOrWhiteSpace(specialty))
+                throw new ArgumentException("Назва спеціальності не може бути порожньою.", nameof(specialty));
+            
+            // Рік вступу не може бути раніше, ніж людині виповнилось 16 років
+            if (admissionYear < DateOfBirth.Year + 16)
+                throw new ArgumentOutOfRangeException(nameof(admissionYear), $"Неможливий рік вступу ({admissionYear}) для народженого в {DateOfBirth.Year} році.");
+
             AdmissionYear = admissionYear;
             Specialty = specialty;
         }
 
-        /// <summary>
-        /// Перевизначений метод. Повертає рядок з розширеною інформацією про студента.
-        /// </summary>
-        /// <returns>Інформаційний рядок про студента.</returns>
         public override string GetInfo()
         {
             return $"Студент: {LastName} {FirstName}, вік: {CalculateAge()}\nСпеціальність: {Specialty}, рік вступу: {AdmissionYear}";
@@ -127,10 +117,6 @@ namespace UniversityModel
 
     // --- Файл: Program.cs ---
 
-    /// <summary>
-    /// Головний клас програми.
-    /// 3. Явно вказано модифікатор доступу internal.
-    /// </summary>
     internal class Program
     {
         static void Main(string[] args)
@@ -138,30 +124,53 @@ namespace UniversityModel
             Console.OutputEncoding = System.Text.Encoding.UTF8;
             Console.InputEncoding = System.Text.Encoding.UTF8;
 
-            // Створюємо об'єкти
-            Person person = new Person("Тарас", "Шевченко", "Григорович", 1814, 3, 9);
-            Student student = new Student("Іван", "Франко", "Якович", 2005, 8, 27, 2022, "Комп'ютерні науки");
+            try
+            {
+                // Створюємо об'єкти. Якщо дані будуть невірні, тут виникне виняток.
+                Person person = new Person("Тарас", "Шевченко", "Григорович", 1814, 3, 9);
+                Student student = new Student("Іван", "Франко", "Якович", 2005, 8, 27, 2022, "Комп'ютерні науки");
 
-            // --- Виконання завдань ---
-            
-            // 1. Визначити вік студента
+                // Виконання завдань
+                RunTasks(person, student);
+            }
+            catch (ArgumentException ex)
+            {
+                // --- 4. ОБРОБКА ВИНЯТКІВ ---
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"\nПОМИЛКА при створенні об'єкта: {ex.Message}");
+                Console.ResetColor();
+            }
+        }
+
+        /// <summary>
+        /// Виконує основні завдання програми.
+        /// </summary>
+        private static void RunTasks(Person person, Student student)
+        {
             Console.WriteLine($"Вік студента {student.LastName} складає: {student.CalculateAge()} років.\n");
 
-            // 2. Визначити кількість зустрічань літери в прізвищі людини
-            Console.Write("Введіть літеру для пошуку в прізвищі 'Шевченко': ");
-            char letterToSearch = Console.ReadKey().KeyChar;
-            Console.WriteLine(); 
+            // --- 3. НАДІЙНА ОБРОБКА ВВОДУ ---
+            char letterToSearch;
+            while (true)
+            {
+                Console.Write("Введіть ОДНУ літеру для пошуку в прізвищі 'Шевченко' та натисніть Enter: ");
+                string input = Console.ReadLine();
+
+                if (input?.Length == 1 && char.IsLetter(input[0]))
+                {
+                    letterToSearch = input[0];
+                    break;
+                }
+                Console.WriteLine("Помилка: потрібно ввести рівно одну літеру. Спробуйте ще раз.");
+            }
 
             int letterCount = person.CountCharInLastName(letterToSearch);
             Console.WriteLine($"Кількість літери '{letterToSearch}' в прізвищі '{person.LastName}' складає: {letterCount}.\n");
-            
-            // 3. Демонстрація поліморфізму (ключова вимога для високої оцінки)
+
             Console.WriteLine("--- Демонстрація поліморфізму ---");
             var people = new List<Person> { person, student };
-
             foreach (var p in people)
             {
-                // Викликається відповідна версія методу GetInfo() для кожного об'єкта
                 Console.WriteLine(p.GetInfo());
                 Console.WriteLine("--------------------");
             }
